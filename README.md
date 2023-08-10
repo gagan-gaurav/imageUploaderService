@@ -6,18 +6,10 @@ Get the tool for zipping the build
 go.exe install github.com/aws/aws-lambda-go/cmd/build-lambda-zip@latest
 ```
 
-Set enviornment variables:
-
-```plaintext
-GOOS=linux
-GOARCH=amd64
-CGO_ENABLED=0
-```
-
-Go build command
+Setting enviornment variables + build command
 
 ```bash
-go build -o build/main cmd/main.go
+$env:GOOS = "linux"; $env:GOARCH = "amd64"; $env:CGO_ENABLED= "0"; go build -o build/main cmd/main.go  
 ```
 
 Go zipping command (make sure GOPATH is set in environment variables.)
