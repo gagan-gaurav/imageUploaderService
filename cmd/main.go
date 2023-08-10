@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"image"
+	"image/jpeg"
 	"net/http"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -12,6 +14,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
+	"github.com/nfnt/resize"
 )
 
 func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
@@ -24,6 +27,25 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 			Body:       "Invalid image data",
 		}, nil
 	}
+
+	// Convert the image data to an image.Image object
+	imageReader := bytes.NewReader(imageData)
+	img, _, err := image.Decode(imageReader)
+	if err != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Body:       "Invalid image data",
+		}, nil
+	}
+
+	// Resize the image to 96x96 pixels
+	newImg := resize.Resize(96, 96, img, resize.Lanczos3)
+
+	// Encode the resized image to JPEG format
+	var resizedImageBuffer bytes.Buffer
+	jpeg.Encode(&resizedImageBuffer, newImg, nil)
+
+	resizedImageData := resizedImageBuffer.Bytes()
 
 	// Create an AWS session
 	sess, err := session.NewSession(&aws.Config{
@@ -38,7 +60,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	bucketName := "boon-image-uploader-service"
 
 	_, err = s3Client.PutObject(&s3.PutObjectInput{
-		Body:   bytes.NewReader(imageData),
+		Body:   bytes.NewReader(resizedImageData),
 		Bucket: aws.String(bucketName),
 		Key:    aws.String(filename),
 	})
@@ -47,7 +69,8 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	}
 
 	responseBody := map[string]string{
-		"message": "Image Updated to AWS Lambda with Go! " + filename,
+		"message": "ImageUploaderService succfully uploaded the image.",
+		"url":     "https://boon-image-uploader-service.s3.ap-south-1.amazonaws.com/" + filename,
 	}
 
 	// Marshal the response body into JSON format
