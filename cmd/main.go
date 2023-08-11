@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/jpeg"
 	"net/http"
+	"strconv"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/aws/aws-lambda-go/lambda"
@@ -19,12 +20,25 @@ import (
 
 func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	filename := request.QueryStringParameters["filename"]
+	filename += ".jpeg" // add the image extension to it.
+
+	height := request.QueryStringParameters["h"]
+	width := request.QueryStringParameters["w"]
+	h, err1 := strconv.Atoi(height)
+	w, err2 := strconv.Atoi(width)
+	if err1 != nil || err2 != nil {
+		return events.APIGatewayProxyResponse{
+			StatusCode: 400,
+			Body:       "Invalid image dimensions",
+		}, nil
+	}
+
 	// Decode the base64-encoded binary image data
 	imageData, err := base64.StdEncoding.DecodeString(request.Body)
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
-			Body:       "Invalid image data",
+			Body:       "Invalid image data, Cannot load binary Image data",
 		}, nil
 	}
 
@@ -34,12 +48,12 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	if err != nil {
 		return events.APIGatewayProxyResponse{
 			StatusCode: 400,
-			Body:       "Invalid image data",
+			Body:       "Invalid image data, Cannot convert binary into Image object",
 		}, nil
 	}
 
-	// Resize the image to 96x96 pixels
-	newImg := resize.Resize(96, 96, img, resize.Lanczos3)
+	// Resize the image to hxw pixels
+	newImg := resize.Resize(uint(h), uint(w), img, resize.Lanczos3)
 
 	// Encode the resized image to JPEG format
 	var resizedImageBuffer bytes.Buffer
@@ -69,7 +83,7 @@ func handler(ctx context.Context, request events.APIGatewayProxyRequest) (events
 	}
 
 	responseBody := map[string]string{
-		"message": "ImageUploaderService succfully uploaded the image.",
+		"message": "ImageUploaderService succfully uploaded the image with dimentions " + strconv.Itoa(h) + "x" + strconv.Itoa(w) + ".",
 		"url":     "https://boon-image-uploader-service.s3.ap-south-1.amazonaws.com/" + filename,
 	}
 
